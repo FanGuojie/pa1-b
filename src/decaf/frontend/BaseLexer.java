@@ -6,6 +6,7 @@ import decaf.Driver;
 import decaf.Location;
 import decaf.error.DecafError;
 import decaf.error.IntTooLargeError;
+import decaf.error.ImgTooLargeError;
 import decaf.tree.Tree;
 
 public abstract class BaseLexer {
@@ -59,6 +60,18 @@ public abstract class BaseLexer {
         }
         return Parser.LITERAL;
     }
+
+  	protected int imgConst(String ival) {
+  		try {
+            int a = Integer.decode(ival.substring(0,ival.length()-1));
+  			setSemantic(getLocation(), SemValue.createLiteral(
+  					Tree.IMG, ival));
+  		} catch (NumberFormatException e) {
+  			Driver.getDriver().issueError(
+  					new ImgTooLargeError(getLocation(), ival.substring(0,ival.length()-1)));
+  		}
+  		return Parser.LITERAL;
+  	}
 
     protected int identifier(String name) {
         setSemantic(getLocation(), SemValue.createIdentifier(name));

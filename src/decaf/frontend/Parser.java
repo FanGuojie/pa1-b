@@ -3,10 +3,10 @@ package decaf.frontend;
 import decaf.Driver;
 import decaf.error.MsgError;
 import decaf.tree.Tree;
+import javafx.util.Pair;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 public class Parser extends Table {
@@ -73,31 +73,57 @@ public class Parser extends Table {
 
     /**
      * Parse function for each non-terminal with error recovery.
-     * NOTE: the current implementation is buggy and may throw NullPointerException.
-     * TODO: find a correct implementation for error recovery!
-     * TODO: You are free to change the method body as you wish, but not the interface!
+     * TODO: add error recovery!
      *
      * @param symbol the non-terminal to be passed.
      * @return the parsed value of `symbol` if parsing succeeded, otherwise `null`.
      */
     private SemValue parse(int symbol, Set<Integer> follow) {
-        Map.Entry<Integer, List<Integer>> result = query(symbol, lookahead); // get production by lookahead symbol
-        int actionId = result.getKey(); // get user-defined action
+        // printSymbol(symbol);
+        // printSymbolSet(beginSet(symbol), 1);
+        // printSymbolSet(followSet(symbol), 2);
+        // printSymbolSet(follow, 3);
+        // printLookahead(lookahead);
 
+        Set<Integer> end = new HashSet<Integer> ();
+        end.addAll(follow);
+        end.addAll(followSet(symbol));
+        // printSymbolSet(end, 4);
+
+        // lookahead不在beginSet里面,出错,跳过
+        if (beginSet(symbol).contains(lookahead) == false) {
+            error();
+            while (beginSet(symbol).contains(lookahead) == false && end.contains(lookahead) == false) {
+                lookahead = lex();
+            }
+            if (beginSet(symbol).contains(lookahead)) {
+                // 继续分析
+            } else {
+                return null;
+            }
+        }
+
+        Pair<Integer, List<Integer>> result = query(symbol, lookahead); // get production by lookahead symbol
+        int actionId = result.getKey(); // get user-defined action
         List<Integer> right = result.getValue(); // right-hand side of production
+        // printSymbolList(actionId, right);
         int length = right.size();
         SemValue[] params = new SemValue[length + 1];
 
         for (int i = 0; i < length; i++) { // parse right-hand side symbols one by one
             int term = right.get(i);
             params[i + 1] = isNonTerminal(term)
-                    ? parse(term, follow) // for non terminals: recursively parse it
+                    ? parse(term, end) // for non terminals: recursively parse it
                     : matchToken(term) // for terminals: match token
                     ;
         }
 
         params[0] = new SemValue(); // initialize return value
-        act(actionId, params); // do user-defined action
+        try {
+            act(actionId, params); // do user-defined action
+        } catch (Exception e) {
+
+        }
         return params[0];
     }
 
@@ -135,14 +161,32 @@ public class Parser extends Table {
      *
      * @param set symbol set.
      */
-    private void printSymbolSet(Set<Integer> set) {
+    private void printSymbolSet(Set<Integer> set, int type) {
         StringBuilder buf = new StringBuilder();
+        switch(type) {
+            case 1:
+                buf.append("beginSet: ");
+                break;
+            case 2:
+                buf.append("followSet: ");
+                break;
+            case 3:
+                buf.append("follow previous: ");
+                break;
+            case 4:
+                buf.append("end: ");
+                break;
+            default:
+                break;
+
+        }
         buf.append("{ ");
         for (Integer i : set) {
             buf.append(name(i));
             buf.append(" ");
         }
         buf.append("}");
+        buf.append("\n");
         System.out.print(buf.toString());
     }
 
@@ -152,13 +196,46 @@ public class Parser extends Table {
      *
      * @param list symbol list.
      */
-    private void printSymbolList(List<Integer> list) {
+    private void printSymbolList(int id, List<Integer> list) {
         StringBuilder buf = new StringBuilder();
-        buf.append(" ");
+        buf.append(id);
+        buf.append(" [ ");
         for (Integer i : list) {
             buf.append(name(i));
             buf.append(" ");
         }
+        buf.append("]");
+        buf.append("\n\n");
+        System.out.print(buf.toString());
+    }
+
+    /**
+     * Helper function. (For debugging)
+     * Pretty print a symbol.
+     *
+     * @param symbol.
+     */
+    private void printSymbol(int symbol) {
+        StringBuilder buf = new StringBuilder();
+        buf.append(" *");
+        buf.append(name(symbol));
+        buf.append("* ");
+        buf.append("\n");
+        System.out.print(buf.toString());
+    }
+
+    /**
+     * Helper function. (For debugging)
+     * Pretty print a symbol.
+     *
+     * @param symbol.
+     */
+    private void printLookahead(int symbol) {
+        StringBuilder buf = new StringBuilder();
+        buf.append(" ~");
+        buf.append(name(symbol));
+        buf.append("~ ");
+        buf.append("\n");
         System.out.print(buf.toString());
     }
 
@@ -166,8 +243,7 @@ public class Parser extends Table {
      * Diagnose function. (For debugging)
      * Implement this by yourself on demand.
      */
-    public void diagnose() {
-
+    public void diagnose(int symbol) {
     }
 
 }

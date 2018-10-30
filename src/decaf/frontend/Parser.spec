@@ -4,6 +4,7 @@ decaf.Location
 decaf.tree.Tree
 decaf.tree.Tree.*
 java.util.*
+javafx.util.Pair
 
 %class Table
 %sem SemValue
@@ -19,6 +20,9 @@ IDENTIFIER   AND      OR    STATIC  INSTANCEOF
 LESS_EQUAL   GREATER_EQUAL  EQUAL   NOT_EQUAL
 '+'  '-'  '*'  '/'  '%'  '='  '>'  '<'  '.'
 ','  ';'  '!'  '('  ')'  '['  ']'  '{'  '}'
+'@' '$' '#' ':'
+COMPLEX IMG PRINT_COMP 
+SUPER DCOPY SCOPY DO OD DO_DIVIDER CASE DEFAULT
 
 %%
 
@@ -72,6 +76,14 @@ SimpleType      :   INT
                     {
                         $$.type = new Tree.TypeIdent(Tree.STRING, $1.loc);
                     }
+                |	COMPLEX
+                	{
+                		$$.type = new Tree.TypeIdent(Tree.COMPLEX, $1.loc);
+                	}
+                |	IMG
+                	{
+                		$$.type = new Tree.TypeIdent(Tree.IMG, $1.loc);
+                	}
                 |   CLASS IDENTIFIER
                     {
                         $$.type = new Tree.TypeClass($2.ident, $1.loc);
@@ -227,6 +239,14 @@ Stmt            :   VariableDef
                     {
                         $$.stmt = $1.stmt;
                     }
+                |	PrintCompStmt ';'
+                    {
+                        $$.stmt = $1.stmt;
+                    }
+                |	DOStmt ';'
+                    {
+                        $$.stmt = $1.stmt;
+                    }
                 |   BreakStmt ';'
                     {
                         $$.stmt = $1.stmt;
@@ -234,6 +254,38 @@ Stmt            :   VariableDef
                 |   StmtBlock
                     {
                         $$.stmt = $1.stmt;
+                    }
+                ;
+
+DOStmt          :   DO DoBranchList OD
+                    {
+                        $$.stmt = new Tree.DoStmt($2.elist, $2.loc);
+                    }
+                ;
+
+
+DoBranchList	:	DoBranch DoBranchList1
+                    {
+                        $$.elist = $2.elist;
+                        $$.elist.add(0, $1.expr);
+                    }
+                ;
+
+DoBranchList1   :   DO_DIVIDER DoBranch DoBranchList1
+                    {
+                        $$.elist = $3.elist;
+                        $$.elist.add(0, $2.expr);
+                    }
+                |   /* empty */
+                    {
+                        $$ = new SemValue();
+                        $$.elist = new ArrayList<Tree.Expr> ();
+                    }
+                ;
+
+DoBranch		:	Expr ':' Stmt
+                    {
+                        $$.expr = new Tree.DoBranch($1.expr, $3.stmt, $1.loc);
                     }
                 ;
 
@@ -344,10 +396,29 @@ Oper7           :   '-'
                         $$.counter = Tree.NOT;
                         $$.loc = $1.loc;
                     }
+                |	'@'
+                	{
+                        $$.counter = Tree.RE;
+                        $$.loc = $1.loc;
+                	}
+                |	'$'
+                	{
+                        $$.counter = Tree.IM;
+                        $$.loc = $1.loc;
+                	}
+                |	'#'
+                	{
+                        $$.counter = Tree.COMPCAST;
+                        $$.loc = $1.loc;
+                	}
                 ;
 
 // expressions
 Expr            :   Expr1
+                    {
+                        $$.expr = $1.expr;
+                    }
+                |   CaseExpr
                     {
                         $$.expr = $1.expr;
                     }
@@ -605,6 +676,18 @@ Expr9           :   Constant
                     {
                         $$.expr = new Tree.ThisExpr($1.loc);
                     }
+                |   SUPER
+                    {
+                        $$.expr = new Tree.SuperExpr($1.loc);
+                    }
+                |	DCOPY '(' Expr ')'
+                	{
+                		$$.expr = new Tree.Unary(Tree.DC, $3.expr, $1.loc);
+                	}
+                |	SCOPY '(' Expr ')'
+                	{
+                		$$.expr = new Tree.Unary(Tree.SC, $3.expr, $1.loc);
+                	}
                 |   NEW AfterNewExpr
                     {
                         if ($2.ident != null) {
@@ -759,3 +842,38 @@ PrintStmt       :   PRINT '(' ExprList ')'
                         $$.stmt = new Tree.Print($3.elist, $1.loc);
                     }
                 ;
+PrintCompStmt   :   PRINT_COMP '(' ExprList ')'
+                    {
+                        $$.stmt = new Tree.PrintComp($3.elist, $1.loc);
+                    }
+                ;
+CaseExpr        :   CASE '(' Expr ')' '{' CaseList DefaultItem '}'
+                    {
+                        $$.expr = new Tree.CaseExpr($3.expr, $6.elist, $7.expr, $3.loc);
+                    }
+                ;
+CaseList        :   CaseItem CaseList
+                    {
+                        $$.elist = $2.elist;
+                        $$.elist.add(0, $1.expr);
+                    }
+                |  /* empty */
+                    {
+                        $$ = new SemValue();
+                        $$.elist = new ArrayList<Tree.Expr> ();
+                    }
+                ;
+
+CaseItem        :   Constant ':' Expr ';'
+                    {
+                        $$.expr = new Tree.CaseItem($1.expr, $3.expr, $1.loc);
+                    }
+                ;
+
+DefaultItem     :   DEFAULT  ':' Expr ';'
+                    {
+                        $$.expr = new Tree.CaseItem($3.expr, $1.loc);
+                    }
+                ;
+
+
